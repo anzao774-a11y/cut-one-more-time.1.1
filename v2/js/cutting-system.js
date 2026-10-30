@@ -650,6 +650,10 @@ function calculateVolume(geometry) {
 /**
  * 分割玉肉
  */
+
+/**
+ * 分割玉肉，保留切割後的位置、尺寸與價值
+ */
 async function splitJade(jade, stone, plane) {
   const geometry = createJadeGeometry(jade, stone);
 
@@ -665,6 +669,8 @@ async function splitJade(jade, stone, plane) {
   const halfThickness = getBladeThickness() / 2;
 
   if (signedDistance - radius >= halfThickness) {
+    geometry.dispose();
+
     return {
       negative: null,
       positive: { ...jade }
@@ -672,59 +678,98 @@ async function splitJade(jade, stone, plane) {
   }
 
   if (signedDistance + radius <= -halfThickness) {
+    geometry.dispose();
+
     return {
       negative: { ...jade },
       positive: null
     };
   }
 
+  let result = null;
+
   try {
-    const result = await cutSolidGeometry(
+    const originalVolume = calculateVolume(geometry);
+
+    result = await cutSolidGeometry(
       geometry,
       plane.point,
       plane.normal
     );
 
-    const negative = result.negative
-      ? {
-          ...jade,
-          id: createId(),
-          estimatedValue: Math.round(
-            (jade.estimatedValue || 0) * 0.5
-          ),
-          potentialValue: Math.round(
-            (jade.potentialValue || 0) * 0.5
-          )
-        }
-      : null;
+    const stoneDimensions = stone.dimensions || {
+      x: 1,
+      y: 1,
+      z: 1
+    };
 
-    const positive = result.positive
-      ? {
-          ...jade,
-          id: createId(),
-          estimatedValue: Math.round(
-            (jade.estimatedValue || 0) * 0.5
-          ),
-          potentialValue: Math.round(
-            (jade.potentialValue || 0) * 0.5
-          )
-        }
-      : null;
+    function createJadePiece(pieceGeometry) {
+      if (!pieceGeometry) return null;
 
-    result.negative?.dispose();
-    result.positive?.dispose();
-    geometry.dispose();
+      const volume = calculateVolume(pieceGeometry);
 
-    return { negative, positive };
+      pieceGeometry.computeBoundingBox();
+
+      const bounds = pieceGeometry.boundingBox;
+
+      const pieceCenter = bounds.getCenter(
+        new THREE.Vector3()
+      );
+
+      const dimensions = bounds.getSize(
+        new THREE.Vector3()
+      );
+
+      const ratio = originalVolume > 0
+        ? Math.min(1, Math.max(0, volume / originalVolume))
+        : 0;
+
+      return {
+        ...jade,
+
+        id: createId(),
+
+        position: {
+          x: pieceCenter.x / Math.max(stoneDimensions.x, 0.000001),
+          y: pieceCenter.y / Math.max(stoneDimensions.y, 0.000001),
+          z: pieceCenter.z / Math.max(stoneDimensions.z, 0.000001)
+        },
+
+        dimensions: {
+          x: dimensions.x,
+          y: dimensions.y,
+          z: dimensions.z
+        },
+
+        estimatedValue: Math.round(
+          (jade.estimatedValue || 0) * ratio
+        ),
+
+        potentialValue: Math.round(
+          (jade.potentialValue || 0) * ratio
+        ),
+
+        cutFragment: true
+      };
+    }
+
+    return {
+      negative: createJadePiece(result.negative),
+      positive: createJadePiece(result.positive)
+    };
 
   } catch (error) {
     console.warn("[Cutting] 玉肉切割失敗", error);
 
-    geometry.dispose();
-
     return signedDistance < 0
       ? { negative: { ...jade }, positive: null }
       : { negative: null, positive: { ...jade } };
+
+  } finally {
+    geometry.dispose();
+
+    result?.negative?.dispose();
+    result?.positive?.dispose();
   }
 }
 
