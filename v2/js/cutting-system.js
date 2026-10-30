@@ -701,10 +701,10 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
   const piece = {
     id: createId(),
 
-    name:
-      `${stone.name}｜` +
-      `${side === "negative" ? "左側" : "右側"}` +
-      `${edgeSpall ? "（邊緣剝落）" : ""}`,
+ name:
+  `${stone.name}｜` +
+  `${side === "negative" ? "左側" : "右側"}` +
+  `${edgeSpall ? "（自動剝落石屑）" : ""}`,
 
     type: "fragment",
     kind: "fragment",
@@ -801,7 +801,29 @@ async function performCut() {
         "切割位置沒有形成兩塊有效石料，請調整位置。"
       );
     }
+    // 計算切割後兩塊石料的實際體積
+    const negativeVolume = calculateVolume(
+      rockResult.negative
+    );
 
+    const positiveVolume = calculateVolume(
+      rockResult.positive
+    );
+
+    // 靠近邊緣時，較小的一塊成為獨立剝落石屑
+    const spallSide = edge.edgeSpall
+      ? (
+          negativeVolume <= positiveVolume
+            ? "negative"
+            : "positive"
+        )
+      : null;
+
+    const spallVolume = spallSide === "negative"
+      ? negativeVolume
+      : spallSide === "positive"
+        ? positiveVolume
+        : 0;
     const negativeJade = [];
     const positiveJade = [];
 
@@ -821,12 +843,12 @@ async function performCut() {
       }
     }
 
-    const negativePiece = createPiece(
+       const negativePiece = createPiece(
       stone,
       rockResult.negative,
       negativeJade,
       "negative",
-      edge.edgeSpall,
+      spallSide === "negative",
       sourceVolume
     );
 
@@ -835,7 +857,7 @@ async function performCut() {
       rockResult.positive,
       positiveJade,
       "positive",
-      edge.edgeSpall,
+      spallSide === "positive",
       sourceVolume
     );
 
