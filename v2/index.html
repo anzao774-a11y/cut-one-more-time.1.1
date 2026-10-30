@@ -1,45 +1,165 @@
 
-console.log('[Game] Main module loaded');
 
-// 頁面切換
-function showPage(pageName) {
-  const targetPage = document.getElementById(`page-${pageName}`);
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#171914">
+  <title>再切一刀就好</title>
 
-  if (!targetPage) {
-    console.warn(`[Game] 找不到頁面：${pageName}`);
-    return;
+  <link rel="stylesheet" href="./css/style.css">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://esm.sh/three@0.170.0",
+      "three/examples/jsm/": "https://esm.sh/three@0.170.0/examples/jsm/",
+      "three-mesh-bvh": "https://esm.sh/three-mesh-bvh@0.6.8?deps=three@0.170.0",
+      "three-bvh-csg": "https://esm.sh/three-bvh-csg@0.0.17?external=three,three-mesh-bvh"
+    }
   }
+  </script>
+</head>
 
-  document.querySelectorAll('.page').forEach(page => {
-    page.classList.remove('active');
-  });
+<body>
+  <div class="game-container">
 
-  document.querySelectorAll('.nav-button').forEach(button => {
-    button.classList.remove('active');
-  });
+    <header class="top-bar">
+      <div class="game-logo">
+        <h1>再切一刀就好</h1>
+        <p>哪有賭徒天天輸</p>
+      </div>
 
-  targetPage.classList.add('active');
+      <div class="player-info">
+        <div class="gold-display">
+          <span>金幣</span>
+          <strong id="gold">10,000 G</strong>
+        </div>
+      </div>
+    </header>
 
-  const activeButton = document.querySelector(
-    `.nav-button[data-page="${pageName}"]`
-  );
+    <div class="game-layout">
 
-  if (activeButton) {
-    activeButton.classList.add('active');
-  }
-}
+      <aside class="sidebar">
+        <nav>
+          <button class="nav-button active" data-page="market">市場</button>
+          <button class="nav-button" data-page="appraisal">鑑定</button>
+          <button class="nav-button" data-page="cutting">切石</button>
+          <button class="nav-button" data-page="inventory">倉庫</button>
+          <button class="nav-button" data-page="jewelry">加工</button>
+          <button class="nav-button" data-page="museum">博物館</button>
+          <button class="nav-button" data-page="skills">技能</button>
+          <button class="nav-button" data-page="collection">圖鑑</button>
+          <button class="nav-button" data-page="records">紀錄</button>
+        </nav>
+      </aside>
 
-// 綁定側邊欄按鈕
-document.querySelectorAll('.nav-button').forEach(button => {
-  button.addEventListener('click', () => {
-    showPage(button.dataset.page);
-  });
-});
+      <main class="main-content">
 
-// 提供幾何測試入口，但不讓測試模組影響遊戲啟動
-window.runGeometrySelfTest = async function () {
-  const { runGeometrySelfTest } = await import('./geometry-test.js');
-  return runGeometrySelfTest();
-};
+        <section class="page active" id="page-market">
+          <h2>原石市場</h2>
+          <p>挑選你的下一塊原石。</p>
 
-console.log('[Game] 頁面切換系統已啟動');
+          <div class="market-actions">
+            <button id="draw-one">單次開石（500 G）</button>
+            <button id="draw-ten">十連開石（4,500 G）</button>
+          </div>
+
+          <div id="draw-results"></div>
+        </section>
+
+        <section class="page" id="page-appraisal">
+          <h2>原石鑑定</h2>
+          <div id="appraisal-content">
+            <p>請先從倉庫選擇一塊原石。</p>
+          </div>
+        </section>
+
+        <section class="page" id="page-cutting">
+          <h2>切石工坊</h2>
+
+          <div id="stone-viewer">
+            <div id="viewer-loading">3D 切石畫面準備中……</div>
+          </div>
+
+          <div class="cut-controls">
+            <label>
+              X 軸
+              <input type="range" id="cut-x" min="-1" max="1" step="0.01" value="0">
+            </label>
+
+            <label>
+              Y 軸
+              <input type="range" id="cut-y" min="-1" max="1" step="0.01" value="0">
+            </label>
+
+            <label>
+              Z 軸
+              <input type="range" id="cut-z" min="-1" max="1" step="0.01" value="0">
+            </label>
+
+            <label>
+              切割角度
+              <input type="range" id="cut-angle" min="0" max="180" value="90">
+            </label>
+
+            <button id="preview-cut">預覽切割</button>
+            <button id="start-cut">開始切割</button>
+
+            <p id="cut-status">尚未開始切割</p>
+          </div>
+        </section>
+
+        <section class="page" id="page-inventory">
+          <h2>倉庫</h2>
+          <div id="inventory-content"></div>
+        </section>
+
+        <section class="page" id="page-jewelry">
+          <h2>珠寶加工</h2>
+
+          <div class="jewelry-toolbar">
+            <button data-mold="bracelet">手鐲</button>
+            <button data-mold="ring">戒指</button>
+            <button data-mold="pendant">吊墜</button>
+            <button data-mold="earrings">耳環</button>
+          </div>
+
+          <div id="jewelry-canvas"></div>
+        </section>
+
+        <section class="page" id="page-museum">
+          <h2>博物館</h2>
+
+          <div class="museum-stats">
+            <p>每分鐘收入：<strong id="museum-income">0 G</strong></p>
+            <p>展品總價值：<strong id="museum-value">0 G</strong></p>
+          </div>
+
+          <div id="museum-content"></div>
+        </section>
+
+        <section class="page" id="page-skills">
+          <h2>技能</h2>
+          <div id="skills-content"></div>
+        </section>
+
+        <section class="page" id="page-collection">
+          <h2>原石圖鑑</h2>
+          <div id="collection-content"></div>
+        </section>
+
+        <section class="page" id="page-records">
+          <h2>收藏紀錄</h2>
+          <div id="records-content"></div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
+
