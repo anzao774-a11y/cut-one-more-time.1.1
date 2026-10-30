@@ -607,6 +607,8 @@ function selectStone(id) {
 window.addEventListener("cutting:select", event => {
   const stoneId = event.detail?.stoneId;
 
+  console.log("[Cutting] 收到選取事件：", stoneId);
+
   if (!stoneId) return;
 
   selectStone(stoneId);
