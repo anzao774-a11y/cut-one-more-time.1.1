@@ -1,0 +1,239 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#171713">
+
+  <title>再切一刀就好</title>
+
+  <link rel="stylesheet" href="./css/style.css">
+
+  <!-- Three.js 模組載入設定 -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-title">再切一刀就好</span>
+      <span class="brand-subtitle">哪有賭徒天天輸</span>
+    </div>
+
+    <div class="player-info">
+      <span>金幣</span>
+      <strong id="gold">10,000 G</strong>
+    </div>
+  </header>
+
+  <main class="game-layout">
+
+    <nav class="sidebar">
+      <button class="nav-button active" data-page="market">
+        原石市場
+      </button>
+
+      <button class="nav-button" data-page="appraisal">
+        原石鑑定
+      </button>
+
+      <button class="nav-button" data-page="cutting">
+        3D 切割工坊
+      </button>
+
+      <button class="nav-button" data-page="inventory">
+        我的倉庫
+      </button>
+
+      <button class="nav-button" data-page="jewelry">
+        首飾加工
+      </button>
+
+      <button class="nav-button" data-page="museum">
+        博物館
+      </button>
+
+      <button class="nav-button" data-page="skills">
+        技能與工具
+      </button>
+
+      <button class="nav-button" data-page="collection">
+        收藏圖鑑
+      </button>
+
+      <button class="nav-button" data-page="records">
+        交易紀錄
+      </button>
+    </nav>
+
+    <section class="game-content">
+
+      <section id="page-market" class="page active">
+        <h1>原石市場</h1>
+        <p>下一顆原石，會不會就是你的傳奇收藏？</p>
+
+        <div class="panel">
+          <h2>原石抽取</h2>
+
+          <div class="draw-buttons">
+            <button id="draw-one" class="primary-button">
+              單抽 500 G
+            </button>
+
+            <button id="draw-ten" class="primary-button">
+              十連抽 4,500 G
+            </button>
+          </div>
+
+          <div id="draw-results" class="results">
+            等待抽取原石……
+          </div>
+        </div>
+      </section>
+
+      <section id="page-appraisal" class="page">
+        <h1>原石鑑定</h1>
+        <p>觀察外皮與透光反應，尋找內部玉肉的線索。</p>
+        <div id="appraisal-content" class="panel">
+          請先從倉庫選擇原石。
+        </div>
+      </section>
+
+      <section id="page-cutting" class="page">
+        <h1>3D 切割工坊</h1>
+        <p>旋轉原石，設定切割平面，決定你的每一刀。</p>
+
+        <div id="stone-viewer" class="viewer">
+          <div id="viewer-loading">3D 原石工坊準備中……</div>
+        </div>
+
+        <div class="panel">
+          <h2>切割控制</h2>
+
+          <div class="control-grid">
+            <label>
+              切割位置 X
+              <input id="cut-x" type="range"
+                min="-1" max="1" step="0.01" value="0">
+            </label>
+
+            <label>
+              切割位置 Y
+              <input id="cut-y" type="range"
+                min="-1" max="1" step="0.01" value="0">
+            </label>
+
+            <label>
+              切割位置 Z
+              <input id="cut-z" type="range"
+                min="-1" max="1" step="0.01" value="0">
+            </label>
+
+            <label>
+              切割角度
+              <input id="cut-angle" type="range"
+                min="0" max="180" step="1" value="90">
+            </label>
+          </div>
+
+          <div class="draw-buttons">
+            <button id="preview-cut" class="secondary-button">
+              預覽切割
+            </button>
+
+            <button id="start-cut" class="primary-button">
+              開始切割
+            </button>
+          </div>
+
+          <p id="cut-status">尚未選擇原石。</p>
+        </div>
+      </section>
+
+      <section id="page-inventory" class="page">
+        <h1>我的倉庫</h1>
+        <div id="inventory-content" class="panel">
+          倉庫目前沒有資料。
+        </div>
+      </section>
+
+      <section id="page-jewelry" class="page">
+        <h1>首飾加工</h1>
+        <p>自由安排模具，讓每一塊玉材都發揮價值。</p>
+
+        <div class="panel">
+          <div id="jewelry-canvas-container">
+            <canvas id="jewelry-canvas"></canvas>
+          </div>
+
+          <div id="mold-toolbar" class="draw-buttons">
+            <button data-mold="bangle">玉鐲</button>
+            <button data-mold="ring">戒指</button>
+            <button data-mold="pendant">墜飾</button>
+            <button data-mold="earring">耳環</button>
+            <button id="rotate-mold">旋轉模具</button>
+          </div>
+
+          <div id="material-stats">
+            尚未選擇玉材。
+          </div>
+        </div>
+      </section>
+
+      <section id="page-museum" class="page">
+        <h1>博物館</h1>
+
+        <div class="panel">
+          <h2>每分鐘收益</h2>
+          <strong id="museum-income">0 G / 分鐘</strong>
+
+          <p id="museum-value">
+            展品總價值：0 G
+          </p>
+
+          <div id="museum-content">
+            尚未放入展品。
+          </div>
+        </div>
+      </section>
+
+      <section id="page-skills" class="page">
+        <h1>技能與工具</h1>
+        <div id="skills-content" class="panel">
+          技能系統準備中。
+        </div>
+      </section>
+
+      <section id="page-collection" class="page">
+        <h1>收藏圖鑑</h1>
+        <div id="collection-content" class="panel">
+          尚未發現任何收藏。
+        </div>
+      </section>
+
+      <section id="page-records" class="page">
+        <h1>交易紀錄</h1>
+        <div id="records-content" class="panel">
+          尚無交易紀錄。
+        </div>
+      </section>
+
+    </section>
+
+  </main>
+
+  <div id="notification" class="notification"></div>
+
+  <script type="module" src="./js/main.js"></script>
+
+</body>
+</html>
