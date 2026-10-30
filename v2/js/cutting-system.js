@@ -382,18 +382,32 @@ function updateStoneInfo(stone) {
  * XYZ 滑桿控制切割平面位置。
  * 角度滑桿控制切割方向。
  */
+
 function getCutPlane(stone) {
   const x = Number($("#cut-x")?.value || 0);
   const y = Number($("#cut-y")?.value || 0);
   const z = Number($("#cut-z")?.value || 0);
-  const angle = Number($("#cut-angle")?.value ?? 90);
 
-  const radians = angle * Math.PI / 180;
+  const horizontalAngle =
+    Number($("#cut-angle")?.value ?? 90);
+
+  const verticalAngle =
+    Number($("#cut-angle-y")?.value ?? 0);
+
+  const horizontalRadians =
+    horizontalAngle * Math.PI / 180;
+
+  const verticalRadians =
+    verticalAngle * Math.PI / 180;
 
   const normal = new THREE.Vector3(
-    Math.sin(radians),
-    0,
-    Math.cos(radians)
+    Math.cos(verticalRadians) *
+      Math.sin(horizontalRadians),
+
+    Math.sin(verticalRadians),
+
+    Math.cos(verticalRadians) *
+      Math.cos(horizontalRadians)
   ).normalize();
 
   const dimensions = stone.dimensions || {
