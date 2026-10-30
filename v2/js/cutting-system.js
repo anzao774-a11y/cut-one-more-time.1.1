@@ -862,15 +862,17 @@ async function performCut() {
     );
 
     const record = {
-      id: createId(),
-      stoneId: stone.id,
+  id: createId(),
+  stoneId: stone.id,
 
-      bladeThickness: getBladeThickness(),
+  bladeThickness: getBladeThickness(),
 
-      edgeSpall: edge.edgeSpall,
-      edgeSpallThreshold: edge.threshold,
+  edgeSpall: edge.edgeSpall,
+  edgeSpallThreshold: edge.threshold,
+  spallSide,
+  spallVolume,
 
-      plane: {
+  plane: {
         point: {
           x: plane.point.x,
           y: plane.point.y,
