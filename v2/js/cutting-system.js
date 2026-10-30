@@ -696,7 +696,21 @@ async function splitJade(jade, stone, plane) {
       plane.point,
       plane.normal
     );
+// 幾何引擎沒有成功產生完整的兩側結果時，保留原始玉肉
+if (!result?.negative || !result?.positive) {
+  result?.negative?.dispose();
+  result?.positive?.dispose();
 
+  result = null;
+
+  console.warn(
+    "[Cutting] 玉肉未能完整分割，保留原始玉肉。"
+  );
+
+  return signedDistance < 0
+    ? { negative: { ...jade }, positive: null }
+    : { negative: null, positive: { ...jade } };
+}
     const stoneDimensions = stone.dimensions || {
       x: 1,
       y: 1,
