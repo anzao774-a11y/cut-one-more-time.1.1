@@ -462,6 +462,11 @@ function createInventoryCard(item, type) {
     cuttingButton.addEventListener("click", () => {
       window.selectedStoneId = item.id;
       showPage("cutting");
+      window.dispatchEvent(
+  new CustomEvent("cutting:select", {
+    detail: { stoneId: item.id }
+  })
+);
       notify(`已選取：${item.name}`);
     });
 
