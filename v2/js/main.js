@@ -1,7 +1,15 @@
 
 import { state, loadGame } from "./state.js";
 import { singlePull, tenPull, getPityStatus } from "./gacha.js";
-
+import {
+  initAudio,
+  playSound,
+  startAmbient,
+  setVolume,
+  setMuted,
+  startSaw,
+  stopSaw
+} from "./audio.js";
 console.log("[Game] Main module loaded");
 
 // DOM
@@ -98,7 +106,26 @@ function draw(pullFunction) {
 
   if (!result.success) {
     notify(result.message);
+    playSound("error");
     return;
+  }
+
+  playSound("draw");
+
+  const hasLegendary = result.results.some(
+    stone => stone.rarity === "legendary"
+  );
+
+  const hasEpic = result.results.some(
+    stone => stone.rarity === "epic"
+  );
+
+  if (hasLegendary) {
+    playSound("legendary");
+  } else if (hasEpic) {
+    playSound("rare");
+  } else {
+    playSound("stone");
   }
 
   renderResults(result.results, result.message);
@@ -126,3 +153,15 @@ window.runGeometrySelfTest = async function () {
   const { runGeometrySelfTest } = await import("./geometry-test.js");
   return runGeometrySelfTest();
 };
+// 使用者第一次操作時啟動音效
+document.addEventListener("pointerdown", async function () {
+  await initAudio();
+  await startAmbient();
+}, { once: true });
+
+// 側邊欄按鈕音效
+document.querySelectorAll(".nav-button").forEach(button => {
+  button.addEventListener("click", () => {
+    playSound("button");
+  });
+});
