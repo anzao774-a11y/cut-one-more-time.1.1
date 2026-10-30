@@ -412,7 +412,7 @@ function getCutPlane(stone) {
 
   return {
     normal,
-    point: normal.clone().multiplyScalar(offset),
+    point,
     offset
   };
 }
@@ -437,37 +437,75 @@ function getProjectionRadius(stone, normal) {
 /**
  * 邊緣自動剝落判定
  */
-function getEdgeSpallInfo(stone, plane) {
-  const radius = getProjectionRadius(
-    stone,
-    plane.normal
-  );
 
-  const diameter = radius * 2;
+/**
+ * 根據原石實際幾何形狀判定邊緣剝落
+ */
+function getEdgeSpallInfo(stone, plane) {
+  const geometry = createStoneGeometry(stone);
+  const position = geometry.getAttribute("position");
+
+  let minProjection = Infinity;
+  let maxProjection = -Infinity;
+
+  const vertex = new THREE.Vector3();
+
+  for (let i = 0; i < position.count; i++) {
+    vertex.fromBufferAttribute(position, i);
+
+    const projection = vertex.dot(plane.normal);
+
+    minProjection = Math.min(
+      minProjection,
+      projection
+    );
+
+    maxProjection = Math.max(
+      maxProjection,
+      projection
+    );
+  }
+
+  geometry.dispose();
+
+  const diameter = maxProjection - minProjection;
+
+  const negativeDepth = plane.offset - minProjection;
+  const positiveDepth = maxProjection - plane.offset;
+
+  const remainingEdge = Math.max(
+    0,
+    Math.min(negativeDepth, positiveDepth)
+  );
 
   const threshold = Math.max(
     2.5 * getBladeThickness(),
     0.06 * diameter
   );
 
-  const remainingEdge = Math.max(
-    0,
-    radius - Math.abs(plane.offset)
-  );
+  const intersects =
+    negativeDepth > 0 &&
+    positiveDepth > 0;
 
   return {
     threshold,
     remainingEdge,
-    edgeSpall: remainingEdge <= threshold,
+    negativeDepth,
+    positiveDepth,
+    edgeSpall:
+      intersects && remainingEdge <= threshold,
     diameter
   };
 }
+
 
 function clearPreview() {
   if (!previewGroup) return;
 
   while (previewGroup.children.length) {
-    const child = previewGroup.children.pop();
+    const child = previewGroup.children[0];
+
+    previewGroup.remove(child);
     disposeObject(child);
   }
 }
