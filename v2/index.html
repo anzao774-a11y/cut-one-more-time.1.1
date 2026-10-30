@@ -11,14 +11,18 @@
   <link rel="stylesheet" href="./css/style.css">
 
   <!-- Three.js 模組載入設定 -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-    }
+ 
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://esm.sh/three@0.170.0",
+    "three/examples/jsm/": "https://esm.sh/three@0.170.0/examples/jsm/",
+    "three-mesh-bvh": "https://esm.sh/three-mesh-bvh@0.6.8?deps=three@0.170.0",
+    "three-bvh-csg": "https://esm.sh/three-bvh-csg@0.0.17?deps=three@0.170.0,three-mesh-bvh@0.6.8"
   }
-  </script>
+}
+</script>
+
 </head>
 
 <body>
