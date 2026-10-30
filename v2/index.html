@@ -1,11 +1,10 @@
 
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#171914">
+  <meta name="theme-color" content="#171713">
   <title>再切一刀就好</title>
 
   <link rel="stylesheet" href="./css/style.css">
@@ -25,19 +24,58 @@
 <body>
   <div class="game-container">
 
-    <header class="top-bar">
-      <div class="game-logo">
-        <h1>再切一刀就好</h1>
-        <p>哪有賭徒天天輸</p>
+    <header class="topbar">
+      <div class="brand">
+        <h1 class="brand-title">再切一刀就好</h1>
+        <p class="brand-subtitle">哪有賭徒天天輸</p>
       </div>
 
-      <div class="player-info">
-        <div class="gold-display">
-          <span>金幣</span>
+      <div class="header-right">
+        <div class="player-info">
+          <span>持有金幣</span>
           <strong id="gold">10,000 G</strong>
         </div>
+
+        <button id="settings-toggle" class="secondary-button">
+          ⚙ 設定
+        </button>
       </div>
     </header>
+
+    <section id="settings-panel" class="settings-panel hidden">
+      <h3>遊戲設定</h3>
+
+      <label>
+        <input type="checkbox" id="sound-enabled" checked>
+        音效
+      </label>
+
+      <label>
+        <input type="checkbox" id="animation-enabled" checked>
+        動畫
+      </label>
+
+      <label>
+        主音量
+        <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.7">
+      </label>
+
+      <label>
+        背景音樂
+        <input type="range" id="music-volume" min="0" max="1" step="0.01" value="0.25">
+      </label>
+
+      <label>
+        音效音量
+        <input type="range" id="sfx-volume" min="0" max="1" step="0.01" value="0.7">
+      </label>
+
+      <div class="settings-actions">
+        <button id="export-save" class="secondary-button">匯出存檔</button>
+        <button id="import-save" class="secondary-button">匯入存檔</button>
+        <input id="import-save-file" type="file" accept=".json,application/json" hidden>
+      </div>
+    </section>
 
     <div class="game-layout">
 
@@ -55,23 +93,32 @@
         </nav>
       </aside>
 
-      <main class="main-content">
+      <main class="game-content">
 
         <section class="page active" id="page-market">
           <h2>原石市場</h2>
           <p>挑選你的下一塊原石。</p>
 
-          <div class="market-actions">
-            <button id="draw-one">單次開石（500 G）</button>
-            <button id="draw-ten">十連開石（4,500 G）</button>
-          </div>
+          <div class="panel">
+            <div class="draw-buttons">
+              <button id="draw-one" class="primary-button">
+                單次開石（500 G）
+              </button>
 
-          <div id="draw-results"></div>
+              <button id="draw-ten" class="primary-button">
+                十連開石（4,500 G）
+              </button>
+            </div>
+
+            <div id="draw-results" class="results">
+              等待開石……
+            </div>
+          </div>
         </section>
 
         <section class="page" id="page-appraisal">
           <h2>原石鑑定</h2>
-          <div id="appraisal-content">
+          <div id="appraisal-content" class="panel">
             <p>請先從倉庫選擇一塊原石。</p>
           </div>
         </section>
@@ -79,87 +126,121 @@
         <section class="page" id="page-cutting">
           <h2>切石工坊</h2>
 
-          <div id="stone-viewer">
-            <div id="viewer-loading">3D 切石畫面準備中……</div>
+          <div id="selected-stone-info" class="panel">
+            尚未選擇原石
           </div>
 
-          <div class="cut-controls">
-            <label>
-              X 軸
-              <input type="range" id="cut-x" min="-1" max="1" step="0.01" value="0">
-            </label>
+          <div id="stone-viewer" class="viewer">
+            <div id="viewer-loading">等待載入原石……</div>
+          </div>
 
-            <label>
-              Y 軸
-              <input type="range" id="cut-y" min="-1" max="1" step="0.01" value="0">
-            </label>
+          <div class="panel">
+            <div class="control-grid">
+              <label>
+                X 軸
+                <input type="range" id="cut-x" min="-1" max="1" step="0.01" value="0">
+              </label>
 
-            <label>
-              Z 軸
-              <input type="range" id="cut-z" min="-1" max="1" step="0.01" value="0">
-            </label>
+              <label>
+                Y 軸
+                <input type="range" id="cut-y" min="-1" max="1" step="0.01" value="0">
+              </label>
 
-            <label>
-              切割角度
-              <input type="range" id="cut-angle" min="0" max="180" value="90">
-            </label>
+              <label>
+                Z 軸
+                <input type="range" id="cut-z" min="-1" max="1" step="0.01" value="0">
+              </label>
 
-            <button id="preview-cut">預覽切割</button>
-            <button id="start-cut">開始切割</button>
+              <label>
+                切割角度
+                <input type="range" id="cut-angle" min="0" max="180" value="90">
+              </label>
+            </div>
+
+            <div class="draw-buttons">
+              <button id="preview-cut" class="secondary-button">預覽切割</button>
+              <button id="start-cut" class="primary-button">開始切割</button>
+            </div>
 
             <p id="cut-status">尚未開始切割</p>
           </div>
         </section>
 
         <section class="page" id="page-inventory">
-          <h2>倉庫</h2>
-          <div id="inventory-content"></div>
+          <h2>我的倉庫</h2>
+
+          <div id="inventory-summary" class="inventory-summary"></div>
+
+          <div class="inventory-toolbar">
+            <input id="inventory-search" type="search" placeholder="搜尋物品名稱">
+            <select id="inventory-sort">
+              <option value="newest">最新取得</option>
+              <option value="value-desc">估值由高至低</option>
+              <option value="value-asc">估值由低至高</option>
+            </select>
+          </div>
+
+          <div class="inventory-tabs">
+            <button class="inventory-tab active" data-type="stones">原石</button>
+            <button class="inventory-tab" data-type="materials">材料</button>
+            <button class="inventory-tab" data-type="scraps">碎料</button>
+            <button class="inventory-tab" data-type="jewelry">珠寶</button>
+          </div>
+
+          <div id="inventory-content" class="inventory-grid"></div>
         </section>
 
         <section class="page" id="page-jewelry">
           <h2>珠寶加工</h2>
 
-          <div class="jewelry-toolbar">
-            <button data-mold="bracelet">手鐲</button>
-            <button data-mold="ring">戒指</button>
-            <button data-mold="pendant">吊墜</button>
-            <button data-mold="earrings">耳環</button>
+          <div id="mold-toolbar" class="draw-buttons">
+            <button class="secondary-button" data-mold="jade_bangle">玉鐲</button>
+            <button class="secondary-button" data-mold="ring">戒指</button>
+            <button class="secondary-button" data-mold="pendant">吊墜</button>
+            <button class="secondary-button" data-mold="earring">耳環</button>
           </div>
 
-          <div id="jewelry-canvas"></div>
+          <div id="jewelry-canvas-container" class="panel">
+            <canvas id="jewelry-canvas"></canvas>
+          </div>
+
+          <div id="material-stats"></div>
         </section>
 
         <section class="page" id="page-museum">
           <h2>博物館</h2>
 
-          <div class="museum-stats">
+          <div class="museum-stats panel">
             <p>每分鐘收入：<strong id="museum-income">0 G</strong></p>
             <p>展品總價值：<strong id="museum-value">0 G</strong></p>
           </div>
 
-          <div id="museum-content"></div>
+          <div id="museum-content" class="panel"></div>
         </section>
 
         <section class="page" id="page-skills">
           <h2>技能</h2>
-          <div id="skills-content"></div>
+          <div id="skills-content" class="panel"></div>
         </section>
 
         <section class="page" id="page-collection">
           <h2>原石圖鑑</h2>
-          <div id="collection-content"></div>
+          <div id="collection-content" class="panel"></div>
         </section>
 
         <section class="page" id="page-records">
           <h2>收藏紀錄</h2>
-          <div id="records-content"></div>
+          <div id="records-content" class="panel"></div>
         </section>
 
       </main>
     </div>
   </div>
 
+  <div id="notification" class="notification"></div>
+
   <script type="module" src="./js/main.js"></script>
 </body>
 </html>
+
 
