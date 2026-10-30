@@ -875,10 +875,15 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
 async function performCut() {
   if (busy || !activeStone) return;
 
-  busy = true;
+ busy = true;
 
+if (cutButton) {
   cutButton.disabled = true;
+}
+
+if (previewButton) {
   previewButton.disabled = true;
+}
 
   try {
     await initializeGeometryEngine();
@@ -1038,9 +1043,10 @@ async function performCut() {
 
     clearPreview();
 
-    infoNode.textContent =
-      "切割完成，兩塊石料已放入倉庫。";
-
+    if (infoNode) {
+  infoNode.textContent =
+    "切割完成，兩塊石料已放入倉庫。";
+}
     status(
       edge.edgeSpall
         ? "切割完成！觸發邊緣剝落，石料已存入倉庫。"
@@ -1064,10 +1070,15 @@ async function performCut() {
     notify(error.message || "切割失敗，原石已保留。");
 
   } finally {
-    busy = false;
+ busy = false;
 
-    cutButton.disabled = false;
-    previewButton.disabled = false;
+if (cutButton) {
+  cutButton.disabled = false;
+}
+
+if (previewButton) {
+  previewButton.disabled = false;
+}
   }
 }
 
