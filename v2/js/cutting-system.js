@@ -552,7 +552,13 @@ function selectStone(id) {
 
   status("原石載入完成，可以開始調整切割位置。");
 }
+window.addEventListener("cutting:select", event => {
+  const stoneId = event.detail?.stoneId;
 
+  if (!stoneId) return;
+
+  selectStone(stoneId);
+});
 /**
  * 計算幾何體積
  */
