@@ -1092,7 +1092,7 @@ function bindControls() {
     $("#cut-x"),
     $("#cut-y"),
     $("#cut-z"),
-    $("#cut-angle")
+    $("#cut-angle"),
     $("#cut-angle-y")
   ].forEach(input => {
     input?.addEventListener("input", renderPreview);
