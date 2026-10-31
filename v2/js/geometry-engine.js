@@ -167,7 +167,57 @@ function validateResult(result) {
   return geometry.clone();
 }
 
+function calculateGeometryVolume(geometry) {
+  if (!geometry?.isBufferGeometry) return 0;
 
+  const position = geometry.getAttribute("position");
+  const index = geometry.getIndex();
+
+  if (!position) return 0;
+
+  const triangleCount = index
+    ? index.count / 3
+    : position.count / 3;
+
+  if (
+    !Number.isInteger(triangleCount) ||
+    triangleCount < 4
+  ) {
+    return 0;
+  }
+
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+
+  let signedVolume = 0;
+
+  for (let i = 0; i < triangleCount; i++) {
+    const ia = index ? index.getX(i * 3) : i * 3;
+    const ib = index ? index.getX(i * 3 + 1) : i * 3 + 1;
+    const ic = index ? index.getX(i * 3 + 2) : i * 3 + 2;
+
+    if (
+      ia >= position.count ||
+      ib >= position.count ||
+      ic >= position.count
+    ) {
+      return 0;
+    }
+
+    a.fromBufferAttribute(position, ia);
+    b.fromBufferAttribute(position, ib);
+    c.fromBufferAttribute(position, ic);
+
+    signedVolume += a.dot(
+      b.clone().cross(c)
+    ) / 6;
+  }
+
+  const volume = Math.abs(signedVolume);
+
+  return Number.isFinite(volume) ? volume : 0;
+}
 /**
  * 切割封閉立體
  *
