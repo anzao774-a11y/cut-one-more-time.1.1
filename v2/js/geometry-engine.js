@@ -261,60 +261,78 @@ export async function cutSolidGeometry(
 
   normal.normalize();
 
-  const sourceGeometry = geometry.clone();
-
-  sourceGeometry.computeBoundingSphere();
-
-  if (!sourceGeometry.boundingSphere) {
-    sourceGeometry.dispose();
-    throw new Error("無法取得原石尺寸。");
-  }
-
-  const extent = Math.max(
-    sourceGeometry.boundingSphere.radius * 5,
-    BLADE_THICKNESS * 30
-  );
-
-  const material = new THREE.MeshStandardMaterial({
-    color: 0x88847a,
-    roughness: 0.85,
-    metalness: 0
-  });
-
-  const sourceBrush = new CSG.Brush(
-    sourceGeometry,
-    material
-  );
-
-  sourceBrush.position.set(0, 0, 0);
-  sourceBrush.rotation.set(0, 0, 0);
-  sourceBrush.scale.set(1, 1, 1);
-  sourceBrush.updateMatrixWorld(true);
-
-  const negativeBrush = createHalfSpace(
-    point,
-    normal,
-    extent,
-    -1,
-    material
-  );
-
-  const positiveBrush = createHalfSpace(
-    point,
-    normal,
-    extent,
-    1,
-    material
-  );
-
-  const evaluator = new CSG.Evaluator();
-
-  evaluator.useGroups = false;
-
+  let sourceGeometry = null;
+  let material = null;
+  let sourceBrush = null;
+  let negativeBrush = null;
+  let positiveBrush = null;
   let negativeResult = null;
   let positiveResult = null;
+  let negative = null;
+  let positive = null;
 
   try {
+    sourceGeometry = geometry.clone();
+    sourceGeometry.computeBoundingSphere();
+
+    if (
+      !sourceGeometry.boundingSphere ||
+      !Number.isFinite(sourceGeometry.boundingSphere.radius) ||
+      sourceGeometry.boundingSphere.radius <= 0
+    ) {
+      throw new Error("無法取得原石尺寸。");
+    }
+
+    const sourceVolume = calculateGeometryVolume(sourceGeometry);
+
+    if (
+      !Number.isFinite(sourceVolume) ||
+      sourceVolume <= 0
+    ) {
+      throw new Error("原石體積無效，無法進行切割。");
+    }
+
+    const extent = Math.max(
+      sourceGeometry.boundingSphere.radius * 5,
+      BLADE_THICKNESS * 30
+    );
+
+    material = new THREE.MeshStandardMaterial({
+      color: 0x88847a,
+      roughness: 0.85,
+      metalness: 0
+    });
+
+    sourceBrush = new CSG.Brush(
+      sourceGeometry,
+      material
+    );
+
+    sourceBrush.position.set(0, 0, 0);
+    sourceBrush.rotation.set(0, 0, 0);
+    sourceBrush.scale.set(1, 1, 1);
+    sourceBrush.updateMatrixWorld(true);
+
+    negativeBrush = createHalfSpace(
+      point,
+      normal,
+      extent,
+      -1,
+      material
+    );
+
+    positiveBrush = createHalfSpace(
+      point,
+      normal,
+      extent,
+      1,
+      material
+    );
+
+    const evaluator = new CSG.Evaluator();
+
+    evaluator.useGroups = false;
+
     negativeResult = evaluator.evaluate(
       sourceBrush,
       negativeBrush,
@@ -327,20 +345,48 @@ export async function cutSolidGeometry(
       CSG.INTERSECTION
     );
 
-    const negative = validateResult(negativeResult);
-    const positive = validateResult(positiveResult);
+    negative = validateResult(negativeResult);
+    positive = validateResult(positiveResult);
 
-    if (!negative && !positive) {
-      throw new Error("切割沒有產生有效石料。");
+    // 必須確實產生兩側石料
+    if (!negative || !positive) {
+      throw new Error("切割結果不完整，未能取得兩側有效石料。");
     }
 
-    return {
+    const negativeVolume = calculateGeometryVolume(negative);
+    const positiveVolume = calculateGeometryVolume(positive);
+
+    if (
+      !Number.isFinite(negativeVolume) ||
+      !Number.isFinite(positiveVolume) ||
+      negativeVolume <= 0 ||
+      positiveVolume <= 0
+    ) {
+      throw new Error("切割後的石料體積無效。");
+    }
+
+    // 刀片會帶走部分材料，因此允許切割後總體積小於原石。
+    // 但不允許結果體積明顯超過原石。
+    if (
+      negativeVolume + positiveVolume >
+      sourceVolume * 1.05
+    ) {
+      throw new Error("切割結果體積異常，已取消本次切割。");
+    }
+
+    const result = {
       negative,
       positive,
       bladeThickness: BLADE_THICKNESS,
       planePoint: point.clone(),
       planeNormal: normal.clone()
     };
+
+    // 將幾何體所有權交給呼叫端，避免 finally 釋放有效結果
+    negative = null;
+    positive = null;
+
+    return result;
 
   } catch (error) {
     console.error("[GeometryEngine] 切割失敗", error);
@@ -350,15 +396,19 @@ export async function cutSolidGeometry(
     );
 
   } finally {
-    sourceGeometry.dispose();
+    sourceGeometry?.dispose();
 
-    negativeBrush.geometry.dispose();
-    positiveBrush.geometry.dispose();
+    negativeBrush?.geometry?.dispose();
+    positiveBrush?.geometry?.dispose();
 
-    material.dispose();
+    material?.dispose();
 
     negativeResult?.geometry?.dispose();
     positiveResult?.geometry?.dispose();
+
+    // 若切割失敗，釋放尚未交給呼叫端的結果
+    negative?.dispose();
+    positive?.dispose();
   }
 }
 
