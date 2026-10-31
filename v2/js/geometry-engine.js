@@ -197,13 +197,19 @@ function calculateGeometryVolume(geometry) {
     const ib = index ? index.getX(i * 3 + 1) : i * 3 + 1;
     const ic = index ? index.getX(i * 3 + 2) : i * 3 + 2;
 
-    if (
-      ia >= position.count ||
-      ib >= position.count ||
-      ic >= position.count
-    ) {
-      return 0;
-    }
+  if (
+  !Number.isInteger(ia) ||
+  !Number.isInteger(ib) ||
+  !Number.isInteger(ic) ||
+  ia < 0 ||
+  ib < 0 ||
+  ic < 0 ||
+  ia >= position.count ||
+  ib >= position.count ||
+  ic >= position.count
+) {
+  return 0;
+}
 
     a.fromBufferAttribute(position, ia);
     b.fromBufferAttribute(position, ib);
