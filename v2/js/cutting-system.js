@@ -654,8 +654,10 @@ function calculateVolume(geometry) {
  * 分割玉肉，保留切割後的位置、尺寸與價值
  */
 
+
 async function splitJade(jade, stone, plane) {
   const geometry = createJadeGeometry(jade, stone);
+  let result = null;
 
   try {
     geometry.computeBoundingSphere();
@@ -673,7 +675,7 @@ async function splitJade(jade, stone, plane) {
 
     const halfThickness = getBladeThickness() / 2;
 
-    // 完整位於正側，整塊保留
+    // 完整位於正側
     if (signedDistance - radius >= halfThickness) {
       return {
         negative: null,
@@ -681,7 +683,7 @@ async function splitJade(jade, stone, plane) {
       };
     }
 
-    // 完整位於負側，整塊保留
+    // 完整位於負側
     if (signedDistance + radius <= -halfThickness) {
       return {
         negative: { ...jade },
@@ -689,21 +691,16 @@ async function splitJade(jade, stone, plane) {
       };
     }
 
-    // 玉肉與切割區域相交，必須進行真正的幾何分割
+    // 與切割區域相交，必須真正進行幾何分割
     const originalVolume = calculateVolume(geometry);
 
-    const result = await cutSolidGeometry(
+    result = await cutSolidGeometry(
       geometry,
       plane.point,
       plane.normal
     );
 
-    // 玉肉橫跨切割區域卻無法產生兩側結果，
-    // 不允許用中心位置猜測。
     if (!result?.negative || !result?.positive) {
-      result?.negative?.dispose();
-      result?.positive?.dispose();
-
       throw new Error(
         "玉肉分割結果不完整，為避免誤丟原石，已取消切割。"
       );
@@ -736,7 +733,10 @@ async function splitJade(jade, stone, plane) {
 
       const ratio = Math.min(
         1,
-        Math.max(0, volume / Math.max(originalVolume, 0.000001))
+        Math.max(
+          0,
+          volume / Math.max(originalVolume, 0.000001)
+        )
       );
 
       return {
@@ -774,7 +774,11 @@ async function splitJade(jade, stone, plane) {
     };
 
   } finally {
+    // 無論成功或失敗，都釋放暫存幾何
     geometry.dispose();
+
+    result?.negative?.dispose();
+    result?.positive?.dispose();
   }
 }
 
