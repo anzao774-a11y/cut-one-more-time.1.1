@@ -864,18 +864,19 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
 /**
  * 正式切割
  */
+
+/**
+ * 正式切割
+ */
 async function performCut() {
   if (busy || !activeStone) return;
 
- busy = true;
+  busy = true;
 
-if (cutButton) {
-  cutButton.disabled = true;
-}
+  if (cutButton) cutButton.disabled = true;
+  if (previewButton) previewButton.disabled = true;
 
-if (previewButton) {
-  previewButton.disabled = true;
-}
+  let rockResult = null;
 
   try {
     await initializeGeometryEngine();
@@ -890,26 +891,24 @@ if (previewButton) {
     const edge = getEdgeSpallInfo(stone, plane);
 
     const rockGeometry = createStoneGeometry(stone);
-
     const sourceVolume = calculateVolume(rockGeometry);
 
-    const rockResult = await cutSolidGeometry(
-      rockGeometry,
-      plane.point,
-      plane.normal
-    );
+    try {
+      rockResult = await cutSolidGeometry(
+        rockGeometry,
+        plane.point,
+        plane.normal
+      );
+    } finally {
+      rockGeometry.dispose();
+    }
 
-    rockGeometry.dispose();
-
-    if (!rockResult.negative || !rockResult.positive) {
-      rockResult.negative?.dispose();
-      rockResult.positive?.dispose();
-
+    if (!rockResult?.negative || !rockResult?.positive) {
       throw new Error(
-        "切割位置沒有形成兩塊有效石料，請調整位置。"
+        "切割沒有產生完整的兩側石料，原石已保留。"
       );
     }
-    // 計算切割後兩塊石料的實際體積
+
     const negativeVolume = calculateVolume(
       rockResult.negative
     );
@@ -918,7 +917,6 @@ if (previewButton) {
       rockResult.positive
     );
 
-    // 靠近邊緣時，較小的一塊成為獨立剝落石屑
     const spallSide = edge.edgeSpall
       ? (
           negativeVolume <= positiveVolume
@@ -927,14 +925,10 @@ if (previewButton) {
         )
       : null;
 
-    const spallVolume = spallSide === "negative"
-      ? negativeVolume
-      : spallSide === "positive"
-        ? positiveVolume
-        : 0;
     const negativeJade = [];
     const positiveJade = [];
 
+    // 逐一分割原石內的玉肉
     for (const jade of stone.jadeContents || []) {
       const split = await splitJade(
         jade,
@@ -951,36 +945,57 @@ if (previewButton) {
       }
     }
 
-       const negativePiece = createPiece(
-      stone,
-      rockResult.negative,
-      negativeJade,
-      "negative",
-      spallSide === "negative",
-      sourceVolume
-    );
+    // 只有確實含有玉肉的部分才建立倉庫物品
+    const keptPieces = [];
+    const discardedSides = [];
 
-    const positivePiece = createPiece(
-      stone,
-      rockResult.positive,
-      positiveJade,
-      "positive",
-      spallSide === "positive",
-      sourceVolume
-    );
+    let negativePiece = null;
+    let positivePiece = null;
 
+    if (negativeJade.length > 0) {
+      negativePiece = createPiece(
+        stone,
+        rockResult.negative,
+        negativeJade,
+        "negative",
+        spallSide === "negative",
+        sourceVolume
+      );
+
+      keptPieces.push(negativePiece);
+      rockResult.negative = null;
+    } else {
+      discardedSides.push("左側");
+    }
+
+    if (positiveJade.length > 0) {
+      positivePiece = createPiece(
+        stone,
+        rockResult.positive,
+        positiveJade,
+        "positive",
+        spallSide === "positive",
+        sourceVolume
+      );
+
+      keptPieces.push(positivePiece);
+      rockResult.positive = null;
+    } else {
+      discardedSides.push("右側");
+    }
+
+    // 產生切割紀錄
     const record = {
-  id: createId(),
-  stoneId: stone.id,
+      id: createId(),
+      stoneId: stone.id,
 
-  bladeThickness: getBladeThickness(),
+      bladeThickness: getBladeThickness(),
 
-  edgeSpall: edge.edgeSpall,
-  edgeSpallThreshold: edge.threshold,
-  spallSide,
-  spallVolume,
+      edgeSpall: edge.edgeSpall,
+      edgeSpallThreshold: edge.threshold,
+      spallSide,
 
-  plane: {
+      plane: {
         point: {
           x: plane.point.x,
           y: plane.point.y,
@@ -994,15 +1009,14 @@ if (previewButton) {
         }
       },
 
-      resultPieceIds: [
-        negativePiece.id,
-        positivePiece.id
-      ],
+      resultPieceIds: keptPieces.map(piece => piece.id),
+
+      discardedSides,
 
       timestamp: Date.now()
     };
 
-    // 完成所有幾何計算後才更新倉庫。
+    // 所有判定完成後，才正式更新倉庫
     state.inventory.stones =
       state.inventory.stones.filter(
         item => item?.id !== stone.id
@@ -1010,10 +1024,7 @@ if (previewButton) {
 
     state.inventory.materials ||= [];
 
-    state.inventory.materials.push(
-      negativePiece,
-      positivePiece
-    );
+    state.inventory.materials.push(...keptPieces);
 
     state.records ||= {};
     state.records.cuttingHistory ||= [];
@@ -1036,16 +1047,33 @@ if (previewButton) {
     clearPreview();
 
     if (infoNode) {
-  infoNode.textContent =
-    "切割完成，兩塊石料已放入倉庫。";
-}
+      infoNode.textContent = "切割完成。";
+    }
+
+    // 組合不透露玉肉數量的通知
+    const messages = [];
+
+    if (negativePiece) {
+      messages.push("左側石料含有玉，已保留");
+    } else {
+      messages.push("左側石料未發現玉，已自動丟棄");
+    }
+
+    if (positivePiece) {
+      messages.push("右側石料含有玉，已保留");
+    } else {
+      messages.push("右側石料未發現玉，已自動丟棄");
+    }
+
+    const resultMessage = messages.join("；");
+
     status(
       edge.edgeSpall
-        ? "切割完成！觸發邊緣剝落，石料已存入倉庫。"
-        : "切割完成！兩塊石料已存入倉庫。"
+        ? `切割完成，觸發邊緣剝落。${resultMessage}`
+        : `切割完成。${resultMessage}`
     );
 
-    notify("切割完成，石料已放入倉庫。");
+    notify(`切割完成！${resultMessage}`);
 
     document.dispatchEvent(
       new CustomEvent("cutting:completed")
@@ -1059,18 +1087,21 @@ if (previewButton) {
       true
     );
 
-    notify(error.message || "切割失敗，原石已保留。");
+    notify(
+      error.message || "切割失敗，原石已保留。"
+    );
 
   } finally {
- busy = false;
+    // 清除尚未交給 createPiece 的幾何體
+    if (rockResult) {
+      rockResult.negative?.dispose();
+      rockResult.positive?.dispose();
+    }
 
-if (cutButton) {
-  cutButton.disabled = false;
-}
+    busy = false;
 
-if (previewButton) {
-  previewButton.disabled = false;
-}
+    if (cutButton) cutButton.disabled = false;
+    if (previewButton) previewButton.disabled = false;
   }
 }
 
