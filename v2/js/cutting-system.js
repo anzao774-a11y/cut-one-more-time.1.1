@@ -872,6 +872,7 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
 /**
  * 正式切割
  */
+
 async function performCut() {
   if (busy || !activeStone) return;
 
@@ -881,6 +882,12 @@ async function performCut() {
   if (previewButton) previewButton.disabled = true;
 
   let rockResult = null;
+  let createdPieces = [];
+
+  // 保留切割前的資料，存檔失敗時可以復原
+  const originalStones = [...state.inventory.stones];
+  const originalMaterials = [...(state.inventory.materials || [])];
+  const originalHistory = [...(state.records?.cuttingHistory || [])];
 
   try {
     await initializeGeometryEngine();
@@ -913,43 +920,23 @@ async function performCut() {
       );
     }
 
-    const negativeVolume = calculateVolume(
-      rockResult.negative
-    );
-
-    const positiveVolume = calculateVolume(
-      rockResult.positive
-    );
+    const negativeVolume = calculateVolume(rockResult.negative);
+    const positiveVolume = calculateVolume(rockResult.positive);
 
     const spallSide = edge.edgeSpall
-      ? (
-          negativeVolume <= positiveVolume
-            ? "negative"
-            : "positive"
-        )
+      ? (negativeVolume <= positiveVolume ? "negative" : "positive")
       : null;
 
     const negativeJade = [];
     const positiveJade = [];
 
-    // 逐一分割原石內的玉肉
     for (const jade of stone.jadeContents || []) {
-      const split = await splitJade(
-        jade,
-        stone,
-        plane
-      );
+      const split = await splitJade(jade, stone, plane);
 
-      if (split.negative) {
-        negativeJade.push(split.negative);
-      }
-
-      if (split.positive) {
-        positiveJade.push(split.positive);
-      }
+      if (split.negative) negativeJade.push(split.negative);
+      if (split.positive) positiveJade.push(split.positive);
     }
 
-    // 只有確實含有玉肉的部分才建立倉庫物品
     const keptPieces = [];
     const discardedSides = [];
 
@@ -967,6 +954,7 @@ async function performCut() {
       );
 
       keptPieces.push(negativePiece);
+      createdPieces.push(negativePiece);
       rockResult.negative = null;
     } else {
       discardedSides.push("左側");
@@ -983,63 +971,60 @@ async function performCut() {
       );
 
       keptPieces.push(positivePiece);
+      createdPieces.push(positivePiece);
       rockResult.positive = null;
     } else {
       discardedSides.push("右側");
     }
 
-    // 產生切割紀錄
     const record = {
       id: createId(),
       stoneId: stone.id,
-
       bladeThickness: getBladeThickness(),
-
       edgeSpall: edge.edgeSpall,
       edgeSpallThreshold: edge.threshold,
       spallSide,
-
       plane: {
         point: {
           x: plane.point.x,
           y: plane.point.y,
           z: plane.point.z
         },
-
         normal: {
           x: plane.normal.x,
           y: plane.normal.y,
           z: plane.normal.z
         }
       },
-
       resultPieceIds: keptPieces.map(piece => piece.id),
-
       discardedSides,
-
       timestamp: Date.now()
     };
 
-    // 所有判定完成後，才正式更新倉庫
+    // 更新庫存與紀錄
     state.inventory.stones =
-      state.inventory.stones.filter(
-        item => item?.id !== stone.id
-      );
+      state.inventory.stones.filter(item => item?.id !== stone.id);
 
     state.inventory.materials ||= [];
-
     state.inventory.materials.push(...keptPieces);
 
     state.records ||= {};
     state.records.cuttingHistory ||= [];
-
     state.records.cuttingHistory.push(record);
 
-    saveGame();
+    // 存檔失敗就恢復原本資料
+    if (!saveGame()) {
+      state.inventory.stones = originalStones;
+      state.inventory.materials = originalMaterials;
 
+      state.records.cuttingHistory = originalHistory;
+
+      throw new Error("存檔失敗，已恢復原本庫存，原石沒有被消耗。");
+    }
+
+    // 確認存檔成功後才清除畫面上的原石
     activeStone = null;
     activeStoneId = null;
-
     window.selectedStoneId = null;
 
     if (stoneGroup) {
@@ -1054,7 +1039,6 @@ async function performCut() {
       infoNode.textContent = "切割完成。";
     }
 
-    // 組合不透露玉肉數量的通知
     const messages = [];
 
     if (negativePiece) {
@@ -1096,7 +1080,6 @@ async function performCut() {
     );
 
   } finally {
-    // 清除尚未交給 createPiece 的幾何體
     if (rockResult) {
       rockResult.negative?.dispose();
       rockResult.positive?.dispose();
