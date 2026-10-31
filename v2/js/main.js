@@ -543,6 +543,12 @@ $(
   "#inventory-search, #inventory-filter, [data-inventory-search]"
 )?.addEventListener("input", renderInventory);
 
+ // 切割完成後更新倉庫與金幣顯示
+document.addEventListener("cutting:completed", () => {
+  renderInventory();
+  renderGold();
+});
+
 // ============================================================
 // Appraisal
 // ============================================================
