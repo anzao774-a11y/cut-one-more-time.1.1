@@ -72,6 +72,7 @@ function createHalfSpace(point, normal, extent, side, material) {
   return brush;
 }
 
+
 function validateResult(result) {
   if (!result?.geometry) {
     return null;
@@ -88,14 +89,75 @@ function validateResult(result) {
     return null;
   }
 
+  // 檢查所有頂點是否為有效數值
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const z = position.getZ(i);
+
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      !Number.isFinite(z)
+    ) {
+      return null;
+    }
+  }
+
   const size = new THREE.Vector3();
 
   geometry.boundingBox.getSize(size);
 
   if (
+    !Number.isFinite(size.x) ||
+    !Number.isFinite(size.y) ||
+    !Number.isFinite(size.z) ||
     size.x < 0.000001 ||
     size.y < 0.000001 ||
     size.z < 0.000001
+  ) {
+    return null;
+  }
+
+  // 檢查幾何體積
+  const index = geometry.getIndex();
+
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+
+  let signedVolume = 0;
+
+  const triangleCount = index
+    ? index.count / 3
+    : position.count / 3;
+
+  if (
+    !Number.isInteger(triangleCount) ||
+    triangleCount < 4
+  ) {
+    return null;
+  }
+
+  for (let i = 0; i < triangleCount; i++) {
+    const ia = index ? index.getX(i * 3) : i * 3;
+    const ib = index ? index.getX(i * 3 + 1) : i * 3 + 1;
+    const ic = index ? index.getX(i * 3 + 2) : i * 3 + 2;
+
+    a.fromBufferAttribute(position, ia);
+    b.fromBufferAttribute(position, ib);
+    c.fromBufferAttribute(position, ic);
+
+    signedVolume += a.dot(
+      b.clone().cross(c)
+    ) / 6;
+  }
+
+  const volume = Math.abs(signedVolume);
+
+  if (
+    !Number.isFinite(volume) ||
+    volume < 0.000000001
   ) {
     return null;
   }
@@ -104,6 +166,7 @@ function validateResult(result) {
 
   return geometry.clone();
 }
+
 
 /**
  * 切割封閉立體
