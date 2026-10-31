@@ -653,63 +653,62 @@ function calculateVolume(geometry) {
 /**
  * 分割玉肉，保留切割後的位置、尺寸與價值
  */
+
 async function splitJade(jade, stone, plane) {
   const geometry = createJadeGeometry(jade, stone);
 
-  geometry.computeBoundingSphere();
-
-  const center = geometry.boundingSphere.center;
-  const radius = geometry.boundingSphere.radius;
-
-  const signedDistance = plane.normal.dot(
-    center.clone().sub(plane.point)
-  );
-
-  const halfThickness = getBladeThickness() / 2;
-
-  if (signedDistance - radius >= halfThickness) {
-    geometry.dispose();
-
-    return {
-      negative: null,
-      positive: { ...jade }
-    };
-  }
-
-  if (signedDistance + radius <= -halfThickness) {
-    geometry.dispose();
-
-    return {
-      negative: { ...jade },
-      positive: null
-    };
-  }
-
-  let result = null;
-
   try {
+    geometry.computeBoundingSphere();
+
+    if (!geometry.boundingSphere) {
+      throw new Error("無法確認玉肉幾何位置。");
+    }
+
+    const center = geometry.boundingSphere.center;
+    const radius = geometry.boundingSphere.radius;
+
+    const signedDistance = plane.normal.dot(
+      center.clone().sub(plane.point)
+    );
+
+    const halfThickness = getBladeThickness() / 2;
+
+    // 完整位於正側，整塊保留
+    if (signedDistance - radius >= halfThickness) {
+      return {
+        negative: null,
+        positive: { ...jade }
+      };
+    }
+
+    // 完整位於負側，整塊保留
+    if (signedDistance + radius <= -halfThickness) {
+      return {
+        negative: { ...jade },
+        positive: null
+      };
+    }
+
+    // 玉肉與切割區域相交，必須進行真正的幾何分割
     const originalVolume = calculateVolume(geometry);
 
-    result = await cutSolidGeometry(
+    const result = await cutSolidGeometry(
       geometry,
       plane.point,
       plane.normal
     );
-// 幾何引擎沒有成功產生完整的兩側結果時，保留原始玉肉
-if (!result?.negative || !result?.positive) {
-  result?.negative?.dispose();
-  result?.positive?.dispose();
 
-  result = null;
+    // 玉肉橫跨切割區域卻無法產生兩側結果，
+    // 不允許用中心位置猜測。
+    if (!result?.negative || !result?.positive) {
+      result?.negative?.dispose();
+      result?.positive?.dispose();
 
-  console.warn(
-    "[Cutting] 玉肉未能完整分割，保留原始玉肉。"
-  );
+      throw new Error(
+        "玉肉分割結果不完整，為避免誤丟原石，已取消切割。"
+      );
+    }
 
-  return signedDistance < 0
-    ? { negative: { ...jade }, positive: null }
-    : { negative: null, positive: { ...jade } };
-}
     const stoneDimensions = stone.dimensions || {
       x: 1,
       y: 1,
@@ -717,9 +716,11 @@ if (!result?.negative || !result?.positive) {
     };
 
     function createJadePiece(pieceGeometry) {
-      if (!pieceGeometry) return null;
-
       const volume = calculateVolume(pieceGeometry);
+
+      if (!Number.isFinite(volume) || volume <= 0) {
+        throw new Error("玉肉分割結果無效。");
+      }
 
       pieceGeometry.computeBoundingBox();
 
@@ -733,9 +734,10 @@ if (!result?.negative || !result?.positive) {
         new THREE.Vector3()
       );
 
-      const ratio = originalVolume > 0
-        ? Math.min(1, Math.max(0, volume / originalVolume))
-        : 0;
+      const ratio = Math.min(
+        1,
+        Math.max(0, volume / Math.max(originalVolume, 0.000001))
+      );
 
       return {
         ...jade,
@@ -771,20 +773,11 @@ if (!result?.negative || !result?.positive) {
       positive: createJadePiece(result.positive)
     };
 
-  } catch (error) {
-    console.warn("[Cutting] 玉肉切割失敗", error);
-
-    return signedDistance < 0
-      ? { negative: { ...jade }, positive: null }
-      : { negative: null, positive: { ...jade } };
-
   } finally {
     geometry.dispose();
-
-    result?.negative?.dispose();
-    result?.positive?.dispose();
   }
 }
+
 
 /**
  * 建立切割後石料
