@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { state, saveGame } from "./state.js";
 import { getInventory } from "./inventory.js";
 
@@ -26,6 +26,7 @@ let controls;
 
 let stoneGroup = null;
 let previewGroup = null;
+let stoneScale = 1;
 
 let activeStone = null;
 let activeStoneId = null;
@@ -96,7 +97,11 @@ function createStoneGeometry(stone) {
     z: 1
   };
 
-  const geometry = new THREE.IcosahedronGeometry(1, 4);
+  // 先合併重複頂點，避免三角形接縫分離
+  const originalGeometry = new THREE.IcosahedronGeometry(1, 4);
+  const geometry = mergeVertices(originalGeometry);
+
+  originalGeometry.dispose();
 
   const position = geometry.getAttribute("position");
   const random = seededRandom(hashString(stone.id));
@@ -177,7 +182,7 @@ function createRockMaterial(stone) {
     color: colors[stone.rarity] || 0x77766e,
     roughness: 0.9,
     metalness: 0.02,
-    flatShading: true
+   flatShading: false
   });
 }
 
@@ -295,9 +300,19 @@ function initializeViewer() {
 function renderStone(stone) {
   initializeViewer();
 
+  // 清除上一顆原石留下的預覽群組
+  if (previewGroup) {
+    clearPreview();
+    scene.remove(previewGroup);
+    disposeObject(previewGroup);
+    previewGroup = null;
+  }
+
+  // 清除上一顆原石
   if (stoneGroup) {
     scene.remove(stoneGroup);
     disposeObject(stoneGroup);
+    stoneGroup = null;
   }
 
   stoneGroup = new THREE.Group();
@@ -343,39 +358,21 @@ function renderStone(stone) {
     0.5
   );
 
-  stoneGroup.scale.setScalar(1.5 / maxDimension);
+  stoneScale = 1.5 / maxDimension;
+
+  stoneGroup.scale.setScalar(stoneScale);
+
+  // 預覽群組使用與原石完全相同的縮放比例
+  previewGroup = new THREE.Group();
+  previewGroup.scale.setScalar(stoneScale);
+
+  scene.add(previewGroup);
 
   controls.target.set(0, 0, 0);
+
   camera.position.set(2.2, 1.55, 2.5);
   camera.updateProjectionMatrix();
-
-  previewGroup = new THREE.Group();
-  scene.add(previewGroup);
 }
-
-function updateStoneInfo(stone) {
-  if (!infoNode) return;
-
-  infoNode.replaceChildren();
-
-  const title = document.createElement("h3");
-  title.textContent = stone.name || "未命名原石";
-
-  const detail = document.createElement("p");
-
-  detail.textContent =
-    `${stone.rarityName || stone.rarity}｜` +
-    `${stone.shape || "未知形狀"}｜` +
-    `重量 ${Number(stone.weight || 0).toLocaleString()} g`;
-
-  const value = document.createElement("p");
-
-  value.textContent =
-    `估計價值：${Number(stone.estimatedValue || 0).toLocaleString()} G`;
-
-  infoNode.append(title, detail, value);
-}
-
 /**
  * 切割平面
  *
@@ -545,15 +542,15 @@ function renderPreview() {
     1
   );
 
-  const geometry = new THREE.PlaneGeometry(
-    extent * 3,
-    extent * 3
-  );
+ const geometry = new THREE.PlaneGeometry(
+  extent * 1.6,
+  extent * 1.6
+);
 
   const material = new THREE.MeshBasicMaterial({
     color: edge.edgeSpall ? 0xffc66d : 0x7bd3b0,
     transparent: true,
-    opacity: 0.24,
+   opacity: 0.15,
     side: THREE.DoubleSide,
     depthWrite: false
   });
