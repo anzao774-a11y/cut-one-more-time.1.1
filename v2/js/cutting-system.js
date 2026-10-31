@@ -826,7 +826,20 @@ async function splitJade(jade, stone, plane) {
 /**
  * 建立切割後石料
  */
-function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolume) {
+
+/**
+ * 建立切割後石料
+ * 將石料與玉肉一起移至碎石自己的局部座標原點，
+ * 確保之後再次切割時，切割平面仍以碎石中心為基準。
+ */
+function createPiece(
+  stone,
+  geometry,
+  jadeContents,
+  side,
+  edgeSpall,
+  sourceVolume
+) {
   const volume = calculateVolume(geometry);
 
   const ratio = Math.min(
@@ -836,11 +849,102 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
 
   geometry.computeBoundingBox();
 
-  const dimensions = new THREE.Vector3();
+  const bounds = geometry.boundingBox.clone();
 
-  geometry.boundingBox.getSize(dimensions);
+  const center = bounds.getCenter(new THREE.Vector3());
+  const dimensions = bounds.getSize(new THREE.Vector3());
 
-  const jadeValue = jadeContents.reduce(
+  // 建立以新碎石中心為原點的石料幾何
+  geometry.translate(
+    -center.x,
+    -center.y,
+    -center.z
+  );
+
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+
+  const pieceDimensions = {
+    x: dimensions.x,
+    y: dimensions.y,
+    z: dimensions.z
+  };
+
+  const originalDimensions = stone.dimensions || {
+    x: 1,
+    y: 1,
+    z: 1
+  };
+
+  // 將玉肉同步轉換到新碎石的局部座標
+  const normalizedJadeContents = jadeContents.map(jade => {
+    const nextJade = { ...jade };
+
+    if (jade.modelGeometry) {
+      const loader = new THREE.BufferGeometryLoader();
+      const jadeGeometry = loader.parse(jade.modelGeometry);
+
+      try {
+        jadeGeometry.translate(
+          -center.x,
+          -center.y,
+          -center.z
+        );
+
+        jadeGeometry.computeBoundingBox();
+        jadeGeometry.computeBoundingSphere();
+
+        const jadeBounds = jadeGeometry.boundingBox;
+        const jadeCenter = jadeBounds.getCenter(
+          new THREE.Vector3()
+        );
+        const jadeDimensions = jadeBounds.getSize(
+          new THREE.Vector3()
+        );
+
+        nextJade.modelGeometry = jadeGeometry.toJSON();
+
+        nextJade.position = {
+          x: jadeCenter.x / Math.max(pieceDimensions.x, 0.000001),
+          y: jadeCenter.y / Math.max(pieceDimensions.y, 0.000001),
+          z: jadeCenter.z / Math.max(pieceDimensions.z, 0.000001)
+        };
+
+        nextJade.dimensions = {
+          x: jadeDimensions.x,
+          y: jadeDimensions.y,
+          z: jadeDimensions.z
+        };
+
+      } finally {
+        jadeGeometry.dispose();
+      }
+
+    } else {
+      // 舊存檔沒有精確幾何時，轉換原本的位置資料
+      const oldPosition = jade.position || {
+        x: 0,
+        y: 0,
+        z: 0
+      };
+
+      const absolutePosition = {
+        x: oldPosition.x * originalDimensions.x - center.x,
+        y: oldPosition.y * originalDimensions.y - center.y,
+        z: oldPosition.z * originalDimensions.z - center.z
+      };
+
+      nextJade.position = {
+        x: absolutePosition.x / Math.max(pieceDimensions.x, 0.000001),
+        y: absolutePosition.y / Math.max(pieceDimensions.y, 0.000001),
+        z: absolutePosition.z / Math.max(pieceDimensions.z, 0.000001)
+      };
+    }
+
+    return nextJade;
+  });
+
+  const jadeValue = normalizedJadeContents.reduce(
     (sum, jade) => sum + (Number(jade.estimatedValue) || 0),
     0
   );
@@ -848,10 +952,10 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
   const piece = {
     id: createId(),
 
- name:
-  `${stone.name}｜` +
-  `${side === "negative" ? "左側" : "右側"}` +
-  `${edgeSpall ? "（自動剝落石屑）" : ""}`,
+    name:
+      `${stone.name}｜` +
+      `${side === "negative" ? "左側" : "右側"}` +
+      `${edgeSpall ? "（自動剝落石屑）" : ""}`,
 
     type: "fragment",
     kind: "fragment",
@@ -869,15 +973,12 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
       Math.round((stone.weight || 1) * ratio)
     ),
 
-    dimensions: {
-      x: dimensions.x,
-      y: dimensions.y,
-      z: dimensions.z
-    },
+    dimensions: pieceDimensions,
 
+    // 石料與玉肉現在共用同一個局部座標系
     modelGeometry: geometry.toJSON(),
 
-    jadeContents,
+    jadeContents: normalizedJadeContents,
 
     estimatedValue: Math.round(
       (stone.estimatedValue || 0) * ratio * 0.35 +
@@ -886,7 +987,7 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
 
     potentialValue: Math.round(
       (stone.potentialValue || 0) * ratio * 0.35 +
-      jadeContents.reduce(
+      normalizedJadeContents.reduce(
         (sum, jade) =>
           sum + (Number(jade.potentialValue) || 0),
         0
@@ -904,10 +1005,6 @@ function createPiece(stone, geometry, jadeContents, side, edgeSpall, sourceVolum
 
   return piece;
 }
-
-/**
- * 正式切割
- */
 
 /**
  * 正式切割
