@@ -332,33 +332,10 @@ export function filterInventory(type, options = {}) {
   });
 }
 
-// 清理沒有任何玉肉的無用半塊
-// 有玉肉的半塊永遠不會被自動清除
+// 保留相容性，不自動刪除倉庫中的碎石
 export function cleanEmptyFragments() {
   ensureInventory();
-
-  const materials = state.inventory.materials;
-  const before = materials.length;
-
-  state.inventory.materials = materials.filter(item => {
-    if (!item) return false;
-
-    const hasJade =
-      Array.isArray(item.jadeContents) &&
-      item.jadeContents.length > 0;
-
-    const isFragment =
-      item.type === "fragment" ||
-      item.kind === "fragment";
-
-    return !isFragment || hasJade;
-  });
-
-  const removed = before - state.inventory.materials.length;
-
-  if (removed > 0) saveGame();
-
-  return removed;
+  return 0;
 }
 
 // 將倉庫資料儲存
