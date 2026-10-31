@@ -86,18 +86,31 @@ function seededRandom(seed) {
   };
 }
 
+
 /**
  * 建立原石模型
- * 原石尺寸使用 stone.dimensions。
+ * 優先讀取已保存的精確幾何，舊存檔則使用原本的生成方式。
  */
 function createStoneGeometry(stone) {
+  // 切割後的石料優先使用保存的真實幾何
+  if (stone.modelGeometry) {
+    const loader = new THREE.BufferGeometryLoader();
+    const geometry = loader.parse(stone.modelGeometry);
+
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+
+    return geometry;
+  }
+
+  // 舊存檔沒有幾何資料時，使用原本的生成方式
   const dimensions = stone.dimensions || {
     x: 1,
     y: 1,
     z: 1
   };
 
-  // 先合併重複頂點，避免三角形接縫分離
   const originalGeometry = new THREE.IcosahedronGeometry(1, 4);
   const geometry = mergeVertices(originalGeometry);
 
@@ -124,10 +137,29 @@ function createStoneGeometry(stone) {
   return geometry;
 }
 
+
 /**
  * 建立玉肉模型
  */
+
+/**
+ * 建立玉肉模型
+ * 優先讀取切割後保存的精確幾何。
+ */
 function createJadeGeometry(jade, stone) {
+  // 有保存精確幾何時，不再用橢圓球代替
+  if (jade.modelGeometry) {
+    const loader = new THREE.BufferGeometryLoader();
+    const geometry = loader.parse(jade.modelGeometry);
+
+    geometry.computeVertexNormals();
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+
+    return geometry;
+  }
+
+  // 舊存檔或尚未切割的玉肉，使用原本的生成方式
   const dimensions = jade.dimensions || {
     x: 0.08,
     y: 0.08,
@@ -165,9 +197,12 @@ function createJadeGeometry(jade, stone) {
   );
 
   geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
 
   return geometry;
 }
+
 
 function createRockMaterial(stone) {
   const colors = {
@@ -655,6 +690,10 @@ function calculateVolume(geometry) {
  */
 
 
+
+/**
+ * 分割玉肉，保存切割後的精確幾何
+ */
 async function splitJade(jade, stone, plane) {
   const geometry = createJadeGeometry(jade, stone);
   let result = null;
@@ -691,7 +730,7 @@ async function splitJade(jade, stone, plane) {
       };
     }
 
-    // 與切割區域相交，必須真正進行幾何分割
+    // 與切割區域相交，進行真正的幾何分割
     const originalVolume = calculateVolume(geometry);
 
     result = await cutSolidGeometry(
@@ -756,6 +795,9 @@ async function splitJade(jade, stone, plane) {
           z: dimensions.z
         },
 
+        // 保存真正切割後的玉肉幾何
+        modelGeometry: pieceGeometry.toJSON(),
+
         estimatedValue: Math.round(
           (jade.estimatedValue || 0) * ratio
         ),
@@ -774,14 +816,12 @@ async function splitJade(jade, stone, plane) {
     };
 
   } finally {
-    // 無論成功或失敗，都釋放暫存幾何
     geometry.dispose();
 
     result?.negative?.dispose();
     result?.positive?.dispose();
   }
 }
-
 
 /**
  * 建立切割後石料
